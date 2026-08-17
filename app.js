@@ -180,11 +180,26 @@
 
   async function initSupabase(){
     showAuth();
+    if ($("supabaseSetupWarning")) $("supabaseSetupWarning").hidden = true;
+    if ($("loginError")) $("loginError").textContent = "";
 
-    if(!configLooksValid() || !window.supabase?.createClient){
+    if(!window.supabase?.createClient){
       $("supabaseSetupWarning").hidden = false;
+      $("supabaseSetupWarning").querySelector("strong").textContent = "Biblioteca do Supabase não carregou";
+      $("supabaseSetupWarning").querySelector("span").textContent = "Confira sua internet e recarregue a página.";
       $("loginBtn").disabled = true;
-      $("loginError").textContent = "Configure o Supabase antes de entrar.";
+      $("loginError").textContent = "Não foi possível carregar o Supabase JS.";
+      return;
+    }
+
+    if(!configLooksValid()){
+      const cfg = window.SUPABASE_CONFIG || {};
+      $("supabaseSetupWarning").hidden = false;
+      $("supabaseSetupWarning").querySelector("strong").textContent = "Configuração do Supabase não foi reconhecida";
+      $("supabaseSetupWarning").querySelector("span").innerHTML =
+        `URL lida: <code>${String(cfg.url || "(vazia)")}</code><br>Key: <code>${cfg.publishableKey ? "encontrada" : "(vazia)"}</code>`;
+      $("loginBtn").disabled = true;
+      $("loginError").textContent = "Revise o supabase-config.js e limpe o cache do site.";
       return;
     }
 
@@ -225,7 +240,14 @@
     $("loginBtn").textContent = "Entrar";
 
     if(error){
-      $("loginError").textContent = "E-mail ou senha inválidos.";
+      const msg = String(error.message || "").toLowerCase();
+      if (msg.includes("invalid login credentials")) {
+        $("loginError").textContent = "E-mail ou senha inválidos.";
+      } else if (msg.includes("email not confirmed")) {
+        $("loginError").textContent = "Confirme o e-mail dessa conta no Supabase antes de entrar.";
+      } else {
+        $("loginError").textContent = "Não foi possível entrar. Confira o usuário no Supabase e tente novamente.";
+      }
       console.error(error);
       return;
     }
@@ -953,7 +975,11 @@
 
   initSupabase();
 
-  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  // Evita que versões antigas do app/configuração fiquem presas em cache.
+  // O financeiro funciona normalmente sem Service Worker.
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations()
+      .then(registrations => registrations.forEach(registration => registration.unregister()))
+      .catch(() => {});
   }
 })();

@@ -1,5 +1,5 @@
--- MEU FINANCEIRO — configuração do Supabase
--- Execute no Supabase Dashboard > SQL Editor > New query.
+-- MEU FINANCEIRO — SUPABASE
+-- Execute uma vez em: Supabase > SQL Editor > New query > Run
 
 create table if not exists public.finance_state (
   user_id uuid primary key references auth.users(id) on delete cascade,
