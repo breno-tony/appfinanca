@@ -399,16 +399,50 @@
   }
 
   function totalsForTransactions(list){
-    let income=0, expense=0;
-    list.forEach(t => t.type === "income" ? income += Number(t.amount||0) : expense += Number(t.amount||0));
-    return {income,expense,result:income-expense};
+    let income=0, expense=0, savingsDeposit=0, savingsWithdraw=0;
+
+    list.forEach(t => {
+      const amount = Number(t.amount||0);
+
+      if(t.type === "income"){
+        income += amount;
+      }else if(t.type === "expense"){
+        expense += amount;
+      }else if(t.type === "savings"){
+        if(t.savingsAction === "withdraw") savingsWithdraw += amount;
+        else savingsDeposit += amount;
+      }
+    });
+
+    return {
+      income,
+      expense,
+      savingsDeposit,
+      savingsWithdraw,
+      result: income - expense,
+      accountResult: income - expense - savingsDeposit + savingsWithdraw,
+      savingsResult: savingsDeposit - savingsWithdraw
+    };
+  }
+
+  function savingsBalance(asOf=new Date()){
+    const cutoff = isoDate(asOf);
+    const realized = data.transactions.filter(t =>
+      String(t.date||"") <= cutoff && t.type === "savings"
+    );
+    const totals = totalsForTransactions(realized);
+    return totals.savingsResult;
   }
 
   function currentBalance(asOf=new Date()){
     const cutoff = isoDate(asOf);
     const realized = data.transactions.filter(t => String(t.date||"") <= cutoff);
     const t = totalsForTransactions(realized);
-    return Number(data.settings.initialBalance||0) + t.result;
+    return Number(data.settings.initialBalance||0) + t.accountResult;
+  }
+
+  function totalWealth(asOf=new Date()){
+    return currentBalance(asOf) + savingsBalance(asOf);
   }
 
   function endOfMonthForKey(key){
@@ -519,6 +553,10 @@
     const nextOpening = projectedOpeningForMonth(nextKey);
     const cm = commissionForMonth(currentKey);
 
+    const savingsNow = savingsBalance();
+    const wealthNow = balance + savingsNow;
+    const realizedSavings = totalsForTransactions(realizedTx.filter(t=>t.type==="savings"));
+
     const futureIncome = scheduled.income + autoCurrentIncome;
     const futureExpense = scheduled.expense;
 
@@ -563,6 +601,21 @@
     $("commissionForecastSubtitle").textContent =
       `Prevista para dia ${data.settings.commissionDay} de ${MONTHS_PT[nextM-1]}`;
 
+    $("savingsBalanceValue").textContent = money(savingsNow);
+    $("savingsBalanceValue").className = `money lg ${savingsNow<0?"amount-expense":""}`;
+    $("savingsBalanceSubtitle").textContent =
+      savingsNow >= 0 ? "Dinheiro separado da conta principal" : "Atenção: retiradas superaram os valores guardados";
+
+    $("savingsDepositedMonth").textContent = money(realizedSavings.savingsDeposit);
+    $("savingsDepositedCount").textContent =
+      `${realizedTx.filter(t=>t.type==="savings" && t.savingsAction!=="withdraw").length} movimentação(ões)`;
+
+    $("savingsWithdrawnMonth").textContent = money(realizedSavings.savingsWithdraw);
+    $("savingsWithdrawnCount").textContent =
+      `${realizedTx.filter(t=>t.type==="savings" && t.savingsAction==="withdraw").length} movimentação(ões)`;
+
+    $("totalWealthValue").textContent = money(wealthNow);
+
     renderReceivables();
     renderCategorySummary();
     renderFutureTransactions();
@@ -587,12 +640,16 @@
           <strong>${capitalize(MONTHS_PT[ref.getMonth()])}</strong>
           <span>${ref.getFullYear()}</span>
         </div>
-        <div class="forecast-line"><span>Saldo inicial</span><strong>${money(summary.opening)}</strong></div>
+        <div class="forecast-line"><span>Saldo inicial conta</span><strong>${money(summary.opening)}</strong></div>
         <div class="forecast-line income"><span>Entradas previstas</span><strong>+ ${money(summary.projectedIncome)}</strong></div>
         <div class="forecast-line expense"><span>Saídas previstas</span><strong>− ${money(summary.projectedExpense)}</strong></div>
+        <div class="forecast-line savings"><span>Guardar na Caixinha</span><strong>− ${money(summary.savingsDeposit)}</strong></div>
+        <div class="forecast-line savings"><span>Retirar da Caixinha</span><strong>+ ${money(summary.savingsWithdraw)}</strong></div>
         <div class="forecast-divider"></div>
-        <div class="forecast-line closing"><span>Fechamento projetado</span><strong>${money(summary.closing)}</strong></div>
-        ${i<3?`<small>Este fechamento alimenta automaticamente o mês seguinte.</small>`:""}
+        <div class="forecast-line closing"><span>Fechamento da conta</span><strong>${money(summary.closing)}</strong></div>
+        <div class="forecast-line"><span>Caixinha projetada</span><strong>${money(summary.savingsClosing)}</strong></div>
+        <div class="forecast-line wealth"><span>Patrimônio projetado</span><strong>${money(summary.wealthClosing)}</strong></div>
+        ${i<3?`<small>Conta e Caixinha são recalculadas automaticamente para o mês seguinte.</small>`:""}
       </div>`);
     }
 
@@ -609,7 +666,10 @@
         label:t.description,
         amount:Number(t.amount||0),
         type:t.type,
-        category:getCategoryName(t.category)
+        savingsAction:t.savingsAction || "deposit",
+        category:t.type==="savings"
+          ? (t.savingsAction==="withdraw" ? "Retirada da Caixinha" : "Depósito na Caixinha")
+          : getCategoryName(t.category)
       }));
 
     const automatic = unregisteredExpectedReceivables(20, 6).map(item => ({
@@ -635,8 +695,16 @@
         <strong>${escapeHtml(row.label)}</strong>
         <span>${row.date.toLocaleDateString("pt-BR")} · ${escapeHtml(row.category)}${row.source==="automatic"?" · automático":""}</span>
       </div>
-      <strong class="${row.type==="income"?"amount-income":"amount-expense"}">
-        ${row.type==="income"?"+":"−"} ${money(row.amount)}
+      <strong class="${
+        row.type==="income" ? "amount-income" :
+        row.type==="savings" && row.savingsAction==="withdraw" ? "amount-income" :
+        "amount-expense"
+      }">
+        ${
+          row.type==="income" ? "+" :
+          row.type==="savings" && row.savingsAction==="withdraw" ? "+" :
+          "−"
+        } ${money(row.amount)}
       </strong>
     </div>`).join("");
   }
@@ -726,7 +794,7 @@
     const totals = totalsForTransactions(tx);
     const autoIncome = expectedReceivablesUntil(date)
       .reduce((sum,item) => sum + Number(item.amount||0), 0);
-    return Number(data.settings.initialBalance||0) + totals.result + autoIncome;
+    return Number(data.settings.initialBalance||0) + totals.accountResult + autoIncome;
   }
 
   function projectedOpeningForMonth(key){
@@ -735,22 +803,53 @@
     return projectedBalanceAt(previousDay);
   }
 
+  function projectedSavingsAt(date){
+    const cutoff = isoDate(date);
+    const tx = data.transactions.filter(t =>
+      String(t.date||"") <= cutoff && t.type === "savings"
+    );
+    return totalsForTransactions(tx).savingsResult;
+  }
+
+  function projectedSavingsOpeningForMonth(key){
+    const start = startOfMonthForKey(key);
+    const previousDay = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59);
+    return projectedSavingsAt(previousDay);
+  }
+
   function projectedMonthSummary(key){
     const opening = projectedOpeningForMonth(key);
+    const savingsOpening = projectedSavingsOpeningForMonth(key);
     const tx = transactionsForMonth(key, "all");
     const totals = totalsForTransactions(tx);
     const auto = expectedReceivablesForMonth(key);
     const autoIncome = auto.reduce((sum,item) => sum + Number(item.amount||0), 0);
 
+    const closing = opening
+      + totals.income
+      + autoIncome
+      - totals.expense
+      - totals.savingsDeposit
+      + totals.savingsWithdraw;
+
+    const savingsClosing = savingsOpening
+      + totals.savingsDeposit
+      - totals.savingsWithdraw;
+
     return {
       key,
       opening,
+      savingsOpening,
       userIncome: totals.income,
       userExpense: totals.expense,
+      savingsDeposit: totals.savingsDeposit,
+      savingsWithdraw: totals.savingsWithdraw,
       autoIncome,
       projectedIncome: totals.income + autoIncome,
       projectedExpense: totals.expense,
-      closing: opening + totals.income + autoIncome - totals.expense,
+      closing,
+      savingsClosing,
+      wealthClosing: closing + savingsClosing,
       autoCount: auto.length,
       txCount: tx.length
     };
@@ -815,10 +914,19 @@
     const rows=data.transactions.filter(isRealizedTransaction).sort((a,b)=>b.date.localeCompare(a.date) || (b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,6);
     const el=$("recentTransactions");
     if(!rows.length){el.innerHTML=`<div class="empty-state">Nada registrado ainda.</div>`;return}
-    el.innerHTML=rows.map(t=>`<div class="compact-item">
-      <div><strong>${escapeHtml(t.description)}</strong><span>${formatDate(t.date)} · ${escapeHtml(getCategoryName(t.category))}</span></div>
-      <strong class="${t.type==="income"?"amount-income":"amount-expense"}">${t.type==="income"?"+":"−"} ${money(t.amount)}</strong>
-    </div>`).join("");
+    el.innerHTML=rows.map(t=>{
+      const isSavings = t.type==="savings";
+      const isWithdraw = isSavings && t.savingsAction==="withdraw";
+      const meta = isSavings
+        ? (isWithdraw ? "Caixinha · Retirada" : "Caixinha · Guardado")
+        : getCategoryName(t.category);
+      const positive = t.type==="income" || isWithdraw;
+
+      return `<div class="compact-item">
+        <div><strong>${escapeHtml(t.description)}</strong><span>${formatDate(t.date)} · ${escapeHtml(meta)}</span></div>
+        <strong class="${positive?"amount-income":"amount-expense"}">${positive?"+":"−"} ${money(t.amount)}</strong>
+      </div>`;
+    }).join("");
   }
 
   function renderTransactions(){
@@ -841,17 +949,28 @@
     $("filteredResult").textContent=money(totals.result);
     $("filteredResult").className=totals.result<0?"amount-expense":"";
     $("transactionsEmpty").style.display=rows.length?"none":"block";
-    $("transactionsTableBody").innerHTML=rows.map(t=>`<tr>
-      <td>${formatDate(t.date)}</td>
-      <td><strong>${escapeHtml(t.description)}</strong>${t.note?`<div class="muted">${escapeHtml(t.note)}</div>`:""}</td>
-      <td>${escapeHtml(getCategoryName(t.category))}</td>
-      <td>
-        <span class="badge ${t.type}">${t.type==="income"?"Entrada":"Saída"}</span>
-        ${isFutureTransaction(t)?`<span class="badge scheduled">Futuro</span>`:""}
-      </td>
-      <td class="${t.type==="income"?"amount-income":"amount-expense"}">${t.type==="income"?"+":"−"} ${money(t.amount)}</td>
-      <td><div class="actions"><button class="row-btn" data-edit-trx="${t.id}">Editar</button><button class="row-btn" data-del-trx="${t.id}">Excluir</button></div></td>
-    </tr>`).join("");
+    $("transactionsTableBody").innerHTML=rows.map(t=>{
+      const isSavings = t.type==="savings";
+      const isWithdraw = isSavings && t.savingsAction==="withdraw";
+      const categoryLabel = isSavings
+        ? (isWithdraw ? "Retirada da Caixinha" : "Depósito na Caixinha")
+        : getCategoryName(t.category);
+      const typeLabel = isSavings ? "Caixinha" : t.type==="income" ? "Entrada" : "Saída";
+      const positive = t.type==="income" || isWithdraw;
+
+      return `<tr>
+        <td>${formatDate(t.date)}</td>
+        <td><strong>${escapeHtml(t.description)}</strong>${t.note?`<div class="muted">${escapeHtml(t.note)}</div>`:""}</td>
+        <td>${escapeHtml(categoryLabel)}</td>
+        <td>
+          <span class="badge ${t.type}">${typeLabel}</span>
+          ${isSavings?`<span class="badge ${isWithdraw?"savings-withdraw":"savings-deposit"}">${isWithdraw?"Retirar":"Guardar"}</span>`:""}
+          ${isFutureTransaction(t)?`<span class="badge scheduled">Futuro</span>`:""}
+        </td>
+        <td class="${positive?"amount-income":"amount-expense"}">${positive?"+":"−"} ${money(t.amount)}</td>
+        <td><div class="actions"><button class="row-btn" data-edit-trx="${t.id}">Editar</button><button class="row-btn" data-del-trx="${t.id}">Excluir</button></div></td>
+      </tr>`;
+    }).join("");
     qsa("[data-edit-trx]").forEach(b=>b.onclick=()=>editTransaction(b.dataset.editTrx));
     qsa("[data-del-trx]").forEach(b=>b.onclick=()=>deleteTransaction(b.dataset.delTrx));
   }
@@ -862,12 +981,21 @@
     if(data.categories.some(c=>c.id===selected)) $("transactionCategory").value=selected;
   }
 
+  function updateTransactionTypeUI(){
+    const type = qsa('input[name="transactionType"]').find(r=>r.checked)?.value || "expense";
+    const isSavings = type === "savings";
+    $("savingsActionPanel").hidden = !isSavings;
+    $("transactionCategoryField").hidden = isSavings;
+    $("transactionCategory").required = !isSavings;
+  }
+
   function newTransaction(){
     $("transactionForm").reset();
     $("transactionId").value="";
     $("transactionDate").value=isoDate();
     $("transactionModalTitle").textContent="Nova movimentação";
     renderTransactionCategoryOptions();
+    updateTransactionTypeUI();
     openModal("transactionModal");
     setTimeout(()=>$("transactionAmount").focus(),50);
   }
@@ -876,13 +1004,15 @@
     const t=data.transactions.find(x=>x.id===id); if(!t)return;
     $("transactionId").value=t.id;
     qsa('input[name="transactionType"]').forEach(r=>r.checked=r.value===t.type);
+    qsa('input[name="savingsAction"]').forEach(r=>r.checked=r.value===(t.savingsAction||"deposit"));
     $("transactionAmount").value=formatInputNumber(t.amount);
     $("transactionDate").value=t.date;
     renderTransactionCategoryOptions();
-    $("transactionCategory").value=t.category;
+    if(t.category) $("transactionCategory").value=t.category;
     $("transactionDescription").value=t.description;
     $("transactionNote").value=t.note||"";
     $("transactionModalTitle").textContent="Editar movimentação";
+    updateTransactionTypeUI();
     openModal("transactionModal");
   }
 
@@ -988,7 +1118,7 @@
     $("projectionCards").innerHTML=grouped.map(g=>`<div class="projection-item">
       <span>${capitalize(MONTHS_PT[g.ref.getMonth()])} ${g.ref.getFullYear()}</span>
       <strong>${money(g.summary.closing)}</strong>
-      <small>Inicial ${money(g.summary.opening)} · +${money(g.summary.projectedIncome)} · −${money(g.summary.projectedExpense)}</small>
+      <small>Conta inicial ${money(g.summary.opening)} · Entradas +${money(g.summary.projectedIncome)} · Saídas −${money(g.summary.projectedExpense)} · Caixinha ${money(g.summary.savingsClosing)}</small>
     </div>`).join("");
   }
 
@@ -1170,6 +1300,10 @@
     $("transactionMonthFilter").onchange=renderTransactions;
     $("transactionTypeFilter").onchange=renderTransactions;
     $("transactionSearch").oninput=renderTransactions;
+
+    qsa('input[name="transactionType"]').forEach(radio=>{
+      radio.addEventListener("change", updateTransactionTypeUI);
+    });
     $("salesMonthFilter").onchange=renderSales;
     $("salesStatusFilter").onchange=renderSales;
 
@@ -1205,12 +1339,16 @@
     $("transactionForm").onsubmit=e=>{
       e.preventDefault();
       const id=$("transactionId").value;
+      const selectedType = qsa('input[name="transactionType"]').find(r=>r.checked)?.value||"expense";
       const item={
         id:id||uid("trx"),
-        type:qsa('input[name="transactionType"]').find(r=>r.checked)?.value||"expense",
+        type:selectedType,
         amount:parseNumber($("transactionAmount").value),
         date:$("transactionDate").value,
-        category:$("transactionCategory").value,
+        category:selectedType==="savings" ? "" : $("transactionCategory").value,
+        savingsAction:selectedType==="savings"
+          ? (qsa('input[name="savingsAction"]').find(r=>r.checked)?.value||"deposit")
+          : undefined,
         description:$("transactionDescription").value.trim(),
         note:$("transactionNote").value.trim(),
         createdAt:new Date().toISOString()

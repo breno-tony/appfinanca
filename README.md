@@ -77,3 +77,26 @@ Exemplo:
 - se uma saída de agosto aumenta R$ 500, agosto passa a fechar em R$ 2.500 e setembro passa automaticamente a iniciar em R$ 2.500.
 
 Qualquer alteração nas movimentações ou nos recebimentos previstos recalcula a cadeia.
+
+
+## V7.4 — Caixinha
+
+Movimentações agora possuem três tipos:
+- Entrada
+- Saída
+- Caixinha
+
+Ao escolher **Caixinha**, escolha:
+- **Guardar**: reduz o saldo da conta principal e aumenta o saldo da Caixinha.
+- **Retirar**: reduz a Caixinha e aumenta o saldo da conta principal.
+
+Transferências para a Caixinha não são tratadas como receita ou despesa. Elas apenas movem dinheiro entre a conta principal e a reserva.
+
+Dashboard:
+- saldo atual da Caixinha;
+- valor guardado no mês;
+- valor retirado no mês;
+- patrimônio total = conta principal + Caixinha;
+- projeção mensal da conta e da Caixinha.
+
+Lançamentos futuros de Caixinha só afetam os saldos projetados até a data chegar.

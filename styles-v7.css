@@ -326,3 +326,53 @@ textarea{resize:vertical}
   .month-forecast-grid{grid-template-columns:1fr}
   .health-grid{grid-template-columns:1fr 1fr}
 }
+
+
+/* V7.4 — Caixinha */
+.transaction-type-segmented{grid-template-columns:repeat(3,1fr)}
+.savings-action-panel{
+  padding:14px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:var(--surface-2);
+  display:grid;
+  gap:12px;
+}
+.savings-action-panel[hidden]{display:none}
+.savings-action-panel>div:first-child strong,
+.savings-action-panel>div:first-child span{display:block}
+.savings-action-panel>div:first-child strong{font-size:12px;color:var(--text)}
+.savings-action-panel>div:first-child span{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4}
+.savings-action-segmented{grid-template-columns:1fr 1fr}
+.savings-dashboard-grid{
+  display:grid;
+  grid-template-columns:1.3fr repeat(3,1fr);
+  gap:12px;
+  margin-bottom:16px;
+}
+.savings-main-card{
+  border-color:#c7d2fe;
+  background:linear-gradient(180deg,#fff,#fafaff);
+}
+.savings-stat-card>span,
+.wealth-card>span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:900}
+.savings-stat-card>strong,
+.wealth-card>strong{display:block;font-size:20px;letter-spacing:-.035em;margin-top:9px}
+.savings-stat-card>small,
+.wealth-card>small{display:block;font-size:9px;color:var(--muted);margin-top:6px}
+.wealth-card{border-color:#bbf7d0}
+.badge.savings{background:#eef2ff;color:#4338ca}
+.badge.savings-deposit{background:#eef2ff;color:#4338ca;margin-left:5px}
+.badge.savings-withdraw{background:#ecfdf5;color:#047857;margin-left:5px}
+.forecast-line.savings strong{color:#4338ca}
+.forecast-line.wealth{padding-top:2px;font-weight:900}
+.forecast-line.wealth span{color:var(--text)}
+.forecast-line.wealth strong{font-size:13px}
+@media(max-width:1150px){
+  .savings-dashboard-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .transaction-type-segmented{grid-template-columns:repeat(3,1fr)}
+  .transaction-type-segmented span{padding:8px 4px;font-size:10px}
+  .savings-dashboard-grid{grid-template-columns:1fr 1fr}
+}

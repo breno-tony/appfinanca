@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <title>Meu Financeiro</title>
-  <link rel="stylesheet" href="styles-v7.css?v=7.3" />
+  <link rel="stylesheet" href="styles-v7.css?v=7.4" />
 </head>
 <body>
 
@@ -153,6 +153,32 @@
           </article>
         </div>
 
+        <div class="savings-dashboard-grid">
+          <article class="card savings-main-card">
+            <div class="card-label">Saldo atual da Caixinha</div>
+            <div class="money lg" id="savingsBalanceValue">R$ 0,00</div>
+            <div class="muted" id="savingsBalanceSubtitle">Dinheiro separado da conta principal</div>
+          </article>
+
+          <article class="card savings-stat-card">
+            <span>Guardado neste mês</span>
+            <strong id="savingsDepositedMonth">R$ 0,00</strong>
+            <small id="savingsDepositedCount">0 movimentações</small>
+          </article>
+
+          <article class="card savings-stat-card">
+            <span>Retirado neste mês</span>
+            <strong id="savingsWithdrawnMonth">R$ 0,00</strong>
+            <small id="savingsWithdrawnCount">0 movimentações</small>
+          </article>
+
+          <article class="card wealth-card">
+            <span>Patrimônio disponível</span>
+            <strong id="totalWealthValue">R$ 0,00</strong>
+            <small>Conta principal + Caixinha</small>
+          </article>
+        </div>
+
         <div class="dashboard-grid">
           <article class="card chart-card">
             <div class="card-head">
@@ -269,6 +295,7 @@
               <option value="all">Todas</option>
               <option value="income">Entradas</option>
               <option value="expense">Saídas</option>
+              <option value="savings">Caixinha</option>
             </select>
             <input id="transactionSearch" class="input grow" type="search" placeholder="Buscar descrição ou categoria..." />
           </div>
@@ -551,9 +578,21 @@
       </div>
       <form id="transactionForm">
         <input type="hidden" id="transactionId" />
-        <div class="segmented">
+        <div class="segmented transaction-type-segmented">
           <label><input type="radio" name="transactionType" value="expense" checked><span>Saída</span></label>
           <label><input type="radio" name="transactionType" value="income"><span>Entrada</span></label>
+          <label><input type="radio" name="transactionType" value="savings"><span>Caixinha</span></label>
+        </div>
+
+        <div id="savingsActionPanel" class="savings-action-panel" hidden>
+          <div>
+            <strong>Movimentação da Caixinha</strong>
+            <span>Guardar tira da conta e coloca na Caixinha. Retirar faz o contrário.</span>
+          </div>
+          <div class="segmented savings-action-segmented">
+            <label><input type="radio" name="savingsAction" value="deposit" checked><span>Guardar</span></label>
+            <label><input type="radio" name="savingsAction" value="withdraw"><span>Retirar</span></label>
+          </div>
         </div>
         <label>Valor
           <input id="transactionAmount" class="input money-input" inputmode="decimal" placeholder="0,00" required />
@@ -562,12 +601,12 @@
           <label>Data
             <input id="transactionDate" class="input" type="date" required />
           </label>
-          <label>Categoria
+          <label id="transactionCategoryField">Categoria
             <select id="transactionCategory" class="input" required></select>
           </label>
         </div>
         <label>Descrição
-          <input id="transactionDescription" class="input" placeholder="Ex.: Mercado, aluguel, salário..." required />
+          <input id="transactionDescription" class="input" placeholder="Ex.: Mercado, salário, reserva de emergência..." required />
         </label>
         <label>Observação
           <textarea id="transactionNote" class="input" rows="3" placeholder="Opcional"></textarea>
@@ -683,6 +722,6 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app-v7.js?v=7.3"></script>
+  <script src="app-v7.js?v=7.4"></script>
 </body>
 </html>
