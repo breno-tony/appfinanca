@@ -274,3 +274,55 @@ textarea{resize:vertical}
   .commission-lock-head{flex-direction:column}
   .commission-lock-controls{grid-template-columns:1fr}
 }
+
+
+/* Dashboard inteligente — realizado x futuro */
+.detail-metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:16px;
+}
+.metric-mini{padding:16px}
+.metric-mini>span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:900}
+.metric-mini>strong{display:block;font-size:19px;letter-spacing:-.035em;margin-top:8px}
+.metric-mini>small{display:block;font-size:9px;color:var(--muted);margin-top:6px;line-height:1.35}
+.metric-mini.future{background:#fbfdff}
+.projection-highlight{border-color:#bfdbfe;background:linear-gradient(180deg,#fff,#f8fbff)}
+.carry-card{border-color:#dbeafe}
+.month-forecast-card{margin-bottom:16px}
+.month-forecast-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.month-forecast-item{padding:16px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line)}
+.month-forecast-item.current{background:#fff;border-color:#bfdbfe;box-shadow:0 8px 22px rgba(37,99,235,.06)}
+.month-forecast-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:15px}
+.month-forecast-title strong{font-size:14px}
+.month-forecast-title span{font-size:10px;color:var(--muted);font-weight:800}
+.forecast-line{display:flex;justify-content:space-between;gap:12px;font-size:10px;margin:8px 0;color:var(--muted)}
+.forecast-line strong{color:var(--text);font-size:11px;text-align:right}
+.forecast-line.income strong{color:var(--success)}
+.forecast-line.expense strong{color:var(--danger)}
+.forecast-divider{height:1px;background:var(--line);margin:12px 0}
+.forecast-line.closing{align-items:end;margin-bottom:5px}
+.forecast-line.closing span{font-weight:900;color:var(--text)}
+.forecast-line.closing strong{font-size:15px}
+.month-forecast-item>small{display:block;font-size:9px;color:var(--muted);line-height:1.4;margin-top:9px}
+.health-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.health-item{padding:12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.health-item span,.health-item strong{display:block}
+.health-item span{font-size:10px;color:var(--muted)}
+.health-item strong{font-size:15px;margin-top:5px}
+.dashboard-progress{margin-top:16px}
+.badge.scheduled{background:#eff6ff;color:#1d4ed8;margin-left:5px}
+.future-compact{border-left:3px solid #bfdbfe}
+@media(max-width:1350px){
+  .detail-metrics-grid{grid-template-columns:repeat(3,1fr)}
+  .month-forecast-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:820px){
+  .detail-metrics-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .detail-metrics-grid{grid-template-columns:1fr 1fr}
+  .month-forecast-grid{grid-template-columns:1fr}
+  .health-grid{grid-template-columns:1fr 1fr}
+}

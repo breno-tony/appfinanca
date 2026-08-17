@@ -369,9 +369,33 @@
     return s.salaryGross * s.advancePercent/100;
   }
 
-  function getCurrentMonthTransactions(){
+  function todayISO(){
+    return isoDate(new Date());
+  }
+
+  function isFutureTransaction(t){
+    return String(t.date || "") > todayISO();
+  }
+
+  function isRealizedTransaction(t){
+    return String(t.date || "") <= todayISO();
+  }
+
+  function getCurrentMonthTransactions(includeFuture=true){
     const key = monthKey(new Date());
-    return data.transactions.filter(t=>monthKey(t.date)===key);
+    return data.transactions.filter(t =>
+      monthKey(t.date) === key &&
+      (includeFuture || isRealizedTransaction(t))
+    );
+  }
+
+  function transactionsForMonth(key, mode="all"){
+    return data.transactions.filter(t => {
+      if(monthKey(t.date) !== key) return false;
+      if(mode === "realized") return isRealizedTransaction(t);
+      if(mode === "future") return isFutureTransaction(t);
+      return true;
+    });
   }
 
   function totalsForTransactions(list){
@@ -380,9 +404,31 @@
     return {income,expense,result:income-expense};
   }
 
-  function currentBalance(){
-    const t = totalsForTransactions(data.transactions);
+  function currentBalance(asOf=new Date()){
+    const cutoff = isoDate(asOf);
+    const realized = data.transactions.filter(t => String(t.date||"") <= cutoff);
+    const t = totalsForTransactions(realized);
     return Number(data.settings.initialBalance||0) + t.result;
+  }
+
+  function endOfMonthForKey(key){
+    const [y,m] = key.split("-").map(Number);
+    return new Date(y, m, 0, 23, 59, 59);
+  }
+
+  function startOfMonthForKey(key){
+    const [y,m] = key.split("-").map(Number);
+    return new Date(y, m-1, 1, 0, 0, 0);
+  }
+
+  function previousMonthKey(key){
+    const [y,m] = key.split("-").map(Number);
+    return monthKey(new Date(y, m-2, 1, 12));
+  }
+
+  function nextMonthKey(key){
+    const [y,m] = key.split("-").map(Number);
+    return monthKey(new Date(y, m, 1, 12));
   }
 
   function getCategoryName(id){
@@ -456,28 +502,173 @@
   }
 
   function renderDashboard(){
-    const monthly = totalsForTransactions(getCurrentMonthTransactions());
-    const balance=currentBalance();
-    const cm = commissionForMonth(monthKey(new Date()));
-    $("balanceValue").textContent=money(balance);
-    $("monthIncomeSmall").textContent=`Entradas: ${money(monthly.income)}`;
-    $("monthExpenseSmall").textContent=`Saídas: ${money(monthly.expense)}`;
-    $("monthResultValue").textContent=money(monthly.result);
-    $("monthResultValue").className=`money lg ${monthly.result<0?"amount-expense":""}`;
-    $("commissionForecastValue").textContent=money(cm.commission);
-    $("commissionForecastSubtitle").textContent=`Recebimento previsto: dia ${data.settings.commissionDay} do próximo mês`;
-    $("salesMonthValue").textContent=money(cm.total);
-    $("commissionRateText").textContent=`Faixa atual: ${percent(cm.rate)}`;
+    const now = new Date();
+    const currentKey = monthKey(now);
+    const nextKey = nextMonthKey(currentKey);
+
+    const realizedTx = transactionsForMonth(currentKey, "realized");
+    const futureTx = transactionsForMonth(currentKey, "future");
+    const realized = totalsForTransactions(realizedTx);
+    const scheduled = totalsForTransactions(futureTx);
+
+    const autoCurrent = expectedReceivablesForMonth(currentKey);
+    const autoCurrentIncome = autoCurrent.reduce((sum,item)=>sum+Number(item.amount||0),0);
+
+    const balance = currentBalance();
+    const currentSummary = projectedMonthSummary(currentKey);
+    const nextOpening = projectedOpeningForMonth(nextKey);
+    const cm = commissionForMonth(currentKey);
+
+    const futureIncome = scheduled.income + autoCurrentIncome;
+    const futureExpense = scheduled.expense;
+
+    $("balanceValue").textContent = money(balance);
+    $("monthIncomeSmall").textContent = `Entradas realizadas: ${money(realized.income)}`;
+    $("monthExpenseSmall").textContent = `Saídas realizadas: ${money(realized.expense)}`;
+
+    $("monthResultValue").textContent = money(realized.result);
+    $("monthResultValue").className = `money lg ${realized.result<0?"amount-expense":""}`;
+    $("monthResultSubtitle").textContent = `Até ${now.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}).replace(".","")}`;
+
+    $("projectedClosingValue").textContent = money(currentSummary.closing);
+    $("projectedClosingValue").className = `money lg ${currentSummary.closing<0?"amount-expense":""}`;
+    $("projectedClosingSubtitle").textContent =
+      `Inclui ${money(futureIncome)} a receber e ${money(futureExpense)} a pagar no restante do mês`;
+
+    const [nextY,nextM] = nextKey.split("-").map(Number);
+    $("carryoverLabel").textContent = `Saldo transportado para ${MONTHS_PT[nextM-1]}`;
+    $("nextMonthOpeningValue").textContent = money(nextOpening);
+    $("nextMonthOpeningValue").className = `money lg ${nextOpening<0?"amount-expense":""}`;
+    $("nextMonthOpeningSubtitle").textContent = "Entrada inicial projetada e recalculada automaticamente";
+
+    $("realizedIncomeValue").textContent = money(realized.income);
+    $("realizedIncomeCount").textContent = `${realizedTx.filter(t=>t.type==="income").length} lançamento(s)`;
+    $("realizedExpenseValue").textContent = money(realized.expense);
+    $("realizedExpenseCount").textContent = `${realizedTx.filter(t=>t.type==="expense").length} lançamento(s)`;
+
+    $("futureIncomeValue").textContent = money(futureIncome);
+    $("futureIncomeCount").textContent =
+      `${futureTx.filter(t=>t.type==="income").length + autoCurrent.length} agendamento(s)`;
+    $("futureExpenseValue").textContent = money(futureExpense);
+    $("futureExpenseCount").textContent =
+      `${futureTx.filter(t=>t.type==="expense").length} agendamento(s)`;
+
+    $("salesMonthValue").textContent = money(cm.total);
+    $("commissionRateText").textContent =
+      data.settings.commissionLocked
+        ? `Comissão: ${percent(cm.rate)} travada`
+        : `Comissão: ${percent(cm.rate)} automática`;
+
+    $("commissionForecastValue").textContent = money(cm.commission);
+    $("commissionForecastSubtitle").textContent =
+      `Prevista para dia ${data.settings.commissionDay} de ${MONTHS_PT[nextM-1]}`;
+
     renderReceivables();
     renderCategorySummary();
+    renderFutureTransactions();
     renderRecentTransactions();
+    renderMonthForecast();
+    renderDashboardHealth(realized);
     requestChart();
   }
 
-  function futureReceivables(limit=5){
+  function renderMonthForecast(){
+    const now = new Date();
+    const cards = [];
+
+    for(let i=0;i<4;i++){
+      const ref = addMonths(now,i);
+      const key = monthKey(ref);
+      const summary = projectedMonthSummary(key);
+      const isCurrent = i===0;
+
+      cards.push(`<div class="month-forecast-item ${isCurrent?"current":""}">
+        <div class="month-forecast-title">
+          <strong>${capitalize(MONTHS_PT[ref.getMonth()])}</strong>
+          <span>${ref.getFullYear()}</span>
+        </div>
+        <div class="forecast-line"><span>Saldo inicial</span><strong>${money(summary.opening)}</strong></div>
+        <div class="forecast-line income"><span>Entradas previstas</span><strong>+ ${money(summary.projectedIncome)}</strong></div>
+        <div class="forecast-line expense"><span>Saídas previstas</span><strong>− ${money(summary.projectedExpense)}</strong></div>
+        <div class="forecast-divider"></div>
+        <div class="forecast-line closing"><span>Fechamento projetado</span><strong>${money(summary.closing)}</strong></div>
+        ${i<3?`<small>Este fechamento alimenta automaticamente o mês seguinte.</small>`:""}
+      </div>`);
+    }
+
+    $("monthForecastGrid").innerHTML = cards.join("");
+  }
+
+  function renderFutureTransactions(){
+    const list = $("futureTransactionsList");
+    const userFuture = data.transactions
+      .filter(isFutureTransaction)
+      .map(t => ({
+        source:"transaction",
+        date:parseISO(t.date),
+        label:t.description,
+        amount:Number(t.amount||0),
+        type:t.type,
+        category:getCategoryName(t.category)
+      }));
+
+    const automatic = unregisteredExpectedReceivables(20, 6).map(item => ({
+      source:"automatic",
+      date:item.date,
+      label:item.label,
+      amount:Number(item.amount||0),
+      type:"income",
+      category:"Recebimento previsto"
+    }));
+
+    const rows = [...userFuture,...automatic]
+      .sort((a,b)=>a.date-b.date)
+      .slice(0,7);
+
+    if(!rows.length){
+      list.innerHTML = `<div class="empty-state">Nenhum lançamento futuro registrado.</div>`;
+      return;
+    }
+
+    list.innerHTML = rows.map(row => `<div class="compact-item future-compact">
+      <div>
+        <strong>${escapeHtml(row.label)}</strong>
+        <span>${row.date.toLocaleDateString("pt-BR")} · ${escapeHtml(row.category)}${row.source==="automatic"?" · automático":""}</span>
+      </div>
+      <strong class="${row.type==="income"?"amount-income":"amount-expense"}">
+        ${row.type==="income"?"+":"−"} ${money(row.amount)}
+      </strong>
+    </div>`).join("");
+  }
+
+  function renderDashboardHealth(realized){
+    const budget = Number(data.settings.monthlyBudget||0);
+    const used = Number(realized.expense||0);
+    const remaining = Math.max(0,budget-used);
+    const pct = budget>0 ? Math.min(100,(used/budget)*100) : 0;
+    const day = Math.max(1,new Date().getDate());
+    const avg = used/day;
+
+    $("dashboardBudgetValue").textContent = money(budget);
+    $("dashboardBudgetUsed").textContent = money(used);
+    $("dashboardBudgetRemaining").textContent = money(remaining);
+    $("dailyExpenseAverage").textContent = money(avg);
+    $("dashboardBudgetPercent").textContent = `${pct.toLocaleString("pt-BR",{maximumFractionDigits:1})}% utilizado`;
+    $("dashboardBudgetStatus").textContent =
+      budget<=0 ? "Defina um orçamento"
+      : pct>=100 ? "Orçamento ultrapassado"
+      : pct>=80 ? "Atenção ao limite"
+      : "Dentro do orçamento";
+
+    const bar = $("dashboardBudgetProgress");
+    bar.style.width = `${pct}%`;
+    bar.style.background = pct>=100 ? "#dc2626" : pct>=80 ? "#d97706" : "#0f172a";
+  }
+
+  function futureReceivables(limit=5, monthsAhead=18){
     const now=new Date();
     const items=[];
-    for(let offset=-1;offset<=3;offset++){
+    for(let offset=-1;offset<=monthsAhead;offset++){
       const ref=addMonths(now,offset);
       const y=ref.getFullYear(), m=ref.getMonth();
       const advanceDate=new Date(y,m,20,12);
@@ -514,6 +705,57 @@
     return data.transactions.some(t=>t.autoKey===receivableTransactionKey(item));
   }
 
+  function unregisteredExpectedReceivables(limit=999, monthsAhead=18){
+    return futureReceivables(limit, monthsAhead).filter(item => !isReceivableRegistered(item));
+  }
+
+  function expectedReceivablesUntil(date){
+    const cutoff = isoDate(date);
+    return unregisteredExpectedReceivables(999, 24)
+      .filter(item => isoDate(item.date) <= cutoff);
+  }
+
+  function expectedReceivablesForMonth(key){
+    return unregisteredExpectedReceivables(999, 24)
+      .filter(item => monthKey(item.date) === key);
+  }
+
+  function projectedBalanceAt(date){
+    const cutoff = isoDate(date);
+    const tx = data.transactions.filter(t => String(t.date||"") <= cutoff);
+    const totals = totalsForTransactions(tx);
+    const autoIncome = expectedReceivablesUntil(date)
+      .reduce((sum,item) => sum + Number(item.amount||0), 0);
+    return Number(data.settings.initialBalance||0) + totals.result + autoIncome;
+  }
+
+  function projectedOpeningForMonth(key){
+    const start = startOfMonthForKey(key);
+    const previousDay = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59);
+    return projectedBalanceAt(previousDay);
+  }
+
+  function projectedMonthSummary(key){
+    const opening = projectedOpeningForMonth(key);
+    const tx = transactionsForMonth(key, "all");
+    const totals = totalsForTransactions(tx);
+    const auto = expectedReceivablesForMonth(key);
+    const autoIncome = auto.reduce((sum,item) => sum + Number(item.amount||0), 0);
+
+    return {
+      key,
+      opening,
+      userIncome: totals.income,
+      userExpense: totals.expense,
+      autoIncome,
+      projectedIncome: totals.income + autoIncome,
+      projectedExpense: totals.expense,
+      closing: opening + totals.income + autoIncome - totals.expense,
+      autoCount: auto.length,
+      txCount: tx.length
+    };
+  }
+
   function renderReceivables(){
     const list=$("receivablesList");
     const items=futureReceivables(5);
@@ -527,7 +769,11 @@
         </div>
         <div class="receivable-value">
           <strong>${money(it.amount)}</strong>
-          ${received?`<small>Já registrado</small>`:`<button class="mini-action" data-receive-index="${i}">Marcar recebido</button>`}
+          ${received
+            ? `<small>Já registrado</small>`
+            : isoDate(it.date) > todayISO()
+              ? `<small>Futuro · ainda não entra no saldo</small>`
+              : `<button class="mini-action" data-receive-index="${i}">Marcar recebido</button>`}
         </div>
       </div>`;
     }).join("");
@@ -552,7 +798,7 @@
   }
 
   function renderCategorySummary(){
-    const monthTx=getCurrentMonthTransactions().filter(t=>t.type==="expense");
+    const monthTx=getCurrentMonthTransactions(false).filter(t=>t.type==="expense");
     const sums={};
     monthTx.forEach(t=>sums[t.category]=(sums[t.category]||0)+Number(t.amount||0));
     const rows=Object.entries(sums).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -566,7 +812,7 @@
   }
 
   function renderRecentTransactions(){
-    const rows=[...data.transactions].sort((a,b)=>b.date.localeCompare(a.date) || (b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,6);
+    const rows=data.transactions.filter(isRealizedTransaction).sort((a,b)=>b.date.localeCompare(a.date) || (b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,6);
     const el=$("recentTransactions");
     if(!rows.length){el.innerHTML=`<div class="empty-state">Nada registrado ainda.</div>`;return}
     el.innerHTML=rows.map(t=>`<div class="compact-item">
@@ -599,7 +845,10 @@
       <td>${formatDate(t.date)}</td>
       <td><strong>${escapeHtml(t.description)}</strong>${t.note?`<div class="muted">${escapeHtml(t.note)}</div>`:""}</td>
       <td>${escapeHtml(getCategoryName(t.category))}</td>
-      <td><span class="badge ${t.type}">${t.type==="income"?"Entrada":"Saída"}</span></td>
+      <td>
+        <span class="badge ${t.type}">${t.type==="income"?"Entrada":"Saída"}</span>
+        ${isFutureTransaction(t)?`<span class="badge scheduled">Futuro</span>`:""}
+      </td>
       <td class="${t.type==="income"?"amount-income":"amount-expense"}">${t.type==="income"?"+":"−"} ${money(t.amount)}</td>
       <td><div class="actions"><button class="row-btn" data-edit-trx="${t.id}">Editar</button><button class="row-btn" data-del-trx="${t.id}">Excluir</button></div></td>
     </tr>`).join("");
@@ -713,7 +962,7 @@
   }
 
   function renderPlanning(){
-    const monthly=totalsForTransactions(getCurrentMonthTransactions());
+    const monthly=totalsForTransactions(getCurrentMonthTransactions(false));
     const budget=Number(data.settings.monthlyBudget||0);
     const used=monthly.expense;
     const pct=budget>0?Math.min(100,used/budget*100):0;
@@ -730,20 +979,16 @@
       <div class="timeline-content"><strong>${escapeHtml(it.label)} · ${money(it.amount)}</strong><span>${isReceivableRegistered(it)?"Registrado no caixa":"Previsto"}</span></div>
     </div>`).join(""):`<div class="empty-state">Sem previsões no período.</div>`;
 
-    let projected=currentBalance();
     const grouped=[];
     for(let i=0;i<3;i++){
       const ref=addMonths(new Date(),i);
-      const key=monthKey(ref);
-      const recs=futureReceivables(20).filter(r=>monthKey(r.date)===key && !isReceivableRegistered(r));
-      const sum=recs.reduce((a,b)=>a+b.amount,0);
-      projected+=sum;
-      grouped.push({ref,sum,projected});
+      const summary=projectedMonthSummary(monthKey(ref));
+      grouped.push({ref,summary});
     }
     $("projectionCards").innerHTML=grouped.map(g=>`<div class="projection-item">
       <span>${capitalize(MONTHS_PT[g.ref.getMonth()])} ${g.ref.getFullYear()}</span>
-      <strong>${money(g.projected)}</strong>
-      <small>+ ${money(g.sum)} em recebimentos previstos</small>
+      <strong>${money(g.summary.closing)}</strong>
+      <small>Inicial ${money(g.summary.opening)} · +${money(g.summary.projectedIncome)} · −${money(g.summary.projectedExpense)}</small>
     </div>`).join("");
   }
 
@@ -818,7 +1063,9 @@
     const rows=[];
     for(let i=5;i>=0;i--){
       const ref=addMonths(now,-i), key=monthKey(ref);
-      const totals=totalsForTransactions(data.transactions.filter(t=>monthKey(t.date)===key));
+      const totals=totalsForTransactions(data.transactions.filter(t =>
+        monthKey(t.date)===key && (key!==monthKey(now) || isRealizedTransaction(t))
+      ));
       rows.push({label:SHORT_MONTHS[ref.getMonth()],...totals});
     }
     const max=Math.max(...rows.flatMap(r=>[r.income,r.expense]),0);
