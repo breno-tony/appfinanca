@@ -16,6 +16,8 @@
       commissionTier2: 1.0,
       commissionTier3: 1.5,
       commissionStep: 0.5,
+      commissionLocked: false,
+      commissionLockedRate: 1.5,
       commissionDay: 10,
       monthlyBudget: 2500
     },
@@ -158,13 +160,6 @@
     $("settingsUserEmail").textContent = user.email || "Conta conectada";
   }
 
-  function configLooksValid(){
-    const cfg = window.SUPABASE_CONFIG || {};
-    return /^https:\/\/.+\.supabase\.co$/i.test(String(cfg.url||"")) &&
-      String(cfg.publishableKey||"").length > 20 &&
-      !String(cfg.publishableKey).includes("COLE_AQUI");
-  }
-
   async function enterAuthenticatedApp(user){
     showApp(user);
     try{
@@ -180,30 +175,36 @@
 
   async function initSupabase(){
     showAuth();
-    if ($("supabaseSetupWarning")) $("supabaseSetupWarning").hidden = true;
-    if ($("loginError")) $("loginError").textContent = "";
 
-    if(!window.supabase?.createClient){
-      $("supabaseSetupWarning").hidden = false;
-      $("supabaseSetupWarning").querySelector("strong").textContent = "Biblioteca do Supabase não carregou";
-      $("supabaseSetupWarning").querySelector("span").textContent = "Confira sua internet e recarregue a página.";
+    const warning = $("supabaseSetupWarning");
+    const loginError = $("loginError");
+    if(warning) warning.hidden = true;
+    if(loginError) loginError.textContent = "";
+
+    const cfg = window.SUPABASE_CONFIG || {};
+
+    if(!window.supabase || typeof window.supabase.createClient !== "function"){
+      if(warning){
+        warning.hidden = false;
+        warning.querySelector("strong").textContent = "Biblioteca do Supabase não carregou";
+        warning.querySelector("span").textContent = "Atualize a página e verifique sua conexão com a internet.";
+      }
       $("loginBtn").disabled = true;
-      $("loginError").textContent = "Não foi possível carregar o Supabase JS.";
+      loginError.textContent = "Falha ao carregar o Supabase JS.";
       return;
     }
 
-    if(!configLooksValid()){
-      const cfg = window.SUPABASE_CONFIG || {};
-      $("supabaseSetupWarning").hidden = false;
-      $("supabaseSetupWarning").querySelector("strong").textContent = "Configuração do Supabase não foi reconhecida";
-      $("supabaseSetupWarning").querySelector("span").innerHTML =
-        `URL lida: <code>${String(cfg.url || "(vazia)")}</code><br>Key: <code>${cfg.publishableKey ? "encontrada" : "(vazia)"}</code>`;
+    if(!cfg.url || !cfg.publishableKey){
+      if(warning){
+        warning.hidden = false;
+        warning.querySelector("strong").textContent = "Configuração ausente";
+        warning.querySelector("span").textContent = "A URL ou a Publishable Key não foi carregada.";
+      }
       $("loginBtn").disabled = true;
-      $("loginError").textContent = "Revise o supabase-config.js e limpe o cache do site.";
+      loginError.textContent = "Configuração do projeto ausente.";
       return;
     }
 
-    const cfg = window.SUPABASE_CONFIG;
     supabaseClient = window.supabase.createClient(cfg.url, cfg.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
@@ -319,12 +320,20 @@
     return d;
   }
 
+  function automaticCommissionRate(total){
+    const s = data.settings;
+    if(total < 200000) return Number(s.commissionTier1 || 0);
+    if(total < 300000) return Number(s.commissionTier2 || 0);
+    const extraSteps = Math.floor((total - 300000) / 100000);
+    return Number(s.commissionTier3 || 0) + extraSteps * Number(s.commissionStep || 0);
+  }
+
   function commissionRate(total){
     const s = data.settings;
-    if(total < 200000) return s.commissionTier1;
-    if(total < 300000) return s.commissionTier2;
-    const extraSteps = Math.floor((total - 300000) / 100000);
-    return s.commissionTier3 + extraSteps * s.commissionStep;
+    if(s.commissionLocked){
+      return Math.max(0, Number(s.commissionLockedRate || 0));
+    }
+    return automaticCommissionRate(total);
   }
 
   function commissionForMonth(key){
@@ -641,11 +650,25 @@
     $("salesCompetencyTotal").textContent=money(info.total);
     $("salesCompetencyRate").textContent=percent(info.rate);
     $("salesCompetencyCommission").textContent=money(info.commission);
+
+    const locked = !!data.settings.commissionLocked;
+    const autoRate = automaticCommissionRate(info.total);
+    $("commissionLockToggle").checked = locked;
+    $("commissionLockedRate").value = String(Number(data.settings.commissionLockedRate || info.rate));
+    $("commissionLockedRate").disabled = !locked;
+    $("commissionLockStatus").textContent = locked ? "Travado" : "Automático";
+    $("commissionModePreview").textContent = locked
+      ? `Travado em ${percent(data.settings.commissionLockedRate)}`
+      : `Automático · ${percent(autoRate)}`;
+    $("commissionModeHelp").textContent = locked
+      ? `O total vendido continua somando. A taxa permanece em ${percent(data.settings.commissionLockedRate)} até você destravar.`
+      : "A porcentagem aumenta normalmente conforme o total vendido.";
     const [y,m]=key.split("-").map(Number);
     const payDate=new Date(y,m,Number(data.settings.commissionDay||10),12);
     $("salesCompetencyPayday").textContent=payDate.toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"}).replace(".","");
-    $("commissionRuleDescription").textContent=
-      `até R$ 199.999,99 = ${percent(data.settings.commissionTier1)}; de R$ 200 mil a R$ 299.999,99 = ${percent(data.settings.commissionTier2)}; a partir de R$ 300 mil = ${percent(data.settings.commissionTier3)}, aumentando ${percent(data.settings.commissionStep)} a cada R$ 100 mil.`;
+    $("commissionRuleDescription").textContent = data.settings.commissionLocked
+      ? `percentual travado em ${percent(data.settings.commissionLockedRate)}. O total vendido continua sendo somado normalmente e a comissão é calculada sobre esse total.`
+      : `até R$ 199.999,99 = ${percent(data.settings.commissionTier1)}; de R$ 200 mil a R$ 299.999,99 = ${percent(data.settings.commissionTier2)}; a partir de R$ 300 mil = ${percent(data.settings.commissionTier3)}, aumentando ${percent(data.settings.commissionStep)} a cada R$ 100 mil.`;
     const rows=data.sales.filter(s=>monthKey(s.date)===key && (filter==="all" || s.status===filter))
       .sort((a,b)=>b.date.localeCompare(a.date));
     $("salesEmpty").style.display=rows.length?"none":"block";
@@ -755,6 +778,8 @@
     $("settingCommissionTier2").value=formatInputNumber(s.commissionTier2);
     $("settingCommissionTier3").value=formatInputNumber(s.commissionTier3);
     $("settingCommissionStep").value=formatInputNumber(s.commissionStep);
+    $("settingCommissionLockEnabled").value=String(!!s.commissionLocked);
+    $("settingCommissionLockedRate").value=formatInputNumber(s.commissionLockedRate);
     $("settingMonthlyBudget").value=formatInputNumber(s.monthlyBudget);
     $("settingCommissionDay").value=s.commissionDay;
   }
@@ -769,6 +794,8 @@
     s.commissionTier2=parseNumber($("settingCommissionTier2").value);
     s.commissionTier3=parseNumber($("settingCommissionTier3").value);
     s.commissionStep=parseNumber($("settingCommissionStep").value);
+    s.commissionLocked=$("settingCommissionLockEnabled").value==="true";
+    s.commissionLockedRate=Math.max(0,parseNumber($("settingCommissionLockedRate").value));
     s.monthlyBudget=parseNumber($("settingMonthlyBudget").value);
     s.commissionDay=Math.max(1,Math.min(28,Math.round(parseNumber($("settingCommissionDay").value)||10)));
     saveData(); renderAll(); showToast("Configurações salvas.");
@@ -899,6 +926,35 @@
     $("salesMonthFilter").onchange=renderSales;
     $("salesStatusFilter").onchange=renderSales;
 
+    $("commissionLockToggle").onchange = () => {
+      const enabled = $("commissionLockToggle").checked;
+      data.settings.commissionLocked = enabled;
+
+      // Ao ativar pela primeira vez, trava na porcentagem automática atual.
+      if(enabled){
+        const key = $("salesMonthFilter").value || monthKey(new Date());
+        const info = commissionForMonth(key);
+        const autoRate = automaticCommissionRate(info.total);
+        data.settings.commissionLockedRate = autoRate;
+      }
+
+      saveData();
+      renderAll();
+      showToast(enabled
+        ? `Aumento da comissão travado em ${percent(data.settings.commissionLockedRate)}.`
+        : "Comissão voltou ao cálculo automático.");
+    };
+
+    $("commissionLockedRate").onchange = () => {
+      data.settings.commissionLockedRate = Math.max(0, parseNumber($("commissionLockedRate").value));
+      if(!data.settings.commissionLocked){
+        data.settings.commissionLocked = true;
+      }
+      saveData();
+      renderAll();
+      showToast(`Percentual travado em ${percent(data.settings.commissionLockedRate)}.`);
+    };
+
     $("transactionForm").onsubmit=e=>{
       e.preventDefault();
       const id=$("transactionId").value;
@@ -974,12 +1030,4 @@
   $("settingsLogoutBtn").addEventListener("click", logout);
 
   initSupabase();
-
-  // Evita que versões antigas do app/configuração fiquem presas em cache.
-  // O financeiro funciona normalmente sem Service Worker.
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations()
-      .then(registrations => registrations.forEach(registration => registration.unregister()))
-      .catch(() => {});
-  }
 })();

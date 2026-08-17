@@ -251,3 +251,26 @@ textarea{resize:vertical}
   .auth-copy h1{font-size:27px}
   .account-line{align-items:stretch;flex-direction:column}
 }
+
+
+/* V7 — trava manual de porcentagem da comissão */
+.commission-lock-card{margin-bottom:16px}
+.commission-lock-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+.commission-lock-head h2{margin-bottom:4px}
+.commission-lock-controls{display:grid;grid-template-columns:minmax(180px,.6fr) minmax(0,1fr);gap:14px;margin-top:18px;align-items:end}
+.commission-lock-preview{padding:12px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+.commission-lock-preview span,.commission-lock-preview strong,.commission-lock-preview small{display:block}
+.commission-lock-preview span{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:900}
+.commission-lock-preview strong{font-size:14px;margin-top:5px}
+.commission-lock-preview small{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4}
+.switch-wrap{display:flex;align-items:center;gap:9px;cursor:pointer;white-space:nowrap}
+.switch-wrap input{display:none}
+.switch{width:46px;height:26px;border-radius:999px;background:#cbd5e1;position:relative;transition:.18s}
+.switch::after{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,.18);transition:.18s}
+.switch-wrap input:checked + .switch{background:var(--primary)}
+.switch-wrap input:checked + .switch::after{transform:translateX(20px)}
+.switch-wrap strong{font-size:11px}
+@media(max-width:600px){
+  .commission-lock-head{flex-direction:column}
+  .commission-lock-controls{grid-template-columns:1fr}
+}
