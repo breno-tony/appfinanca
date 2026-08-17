@@ -1,61 +1,65 @@
-# Meu Financeiro — V6 Supabase
+# Meu Financeiro — versão pronta com Supabase
 
-Esta versão elimina o problema "Supabase ainda não configurado".
+Esta pasta já está configurada com o seu projeto Supabase.
 
-## O que mudou
-- Project URL está embutida diretamente no `index.html`.
-- Publishable Key está embutida diretamente no `index.html`.
-- Não existe mais `supabase-config.js`.
-- Não existe mais Service Worker.
-- `app.js` virou `app-v6.js`.
-- `styles.css` virou `styles-v6.css`.
-- `vercel.json` força `no-store` para os arquivos principais.
-- Ao carregar, o site tenta remover Service Workers e caches antigos.
+## Já configurado
+- Project URL: `https://cuofjjvwgsgkhqhonrwc.supabase.co`
+- Publishable Key: já preenchida em `supabase-config.js`
+- Login por e-mail e senha
+- Sessão persistente
+- Sincronização entre computadores
+- RLS por usuário
+- Backup JSON
+- Sem cadastro público no site
 
-## Supabase configurado
-Project URL:
-https://cuofjjvwgsgkhqhonrwc.supabase.co
+## Antes de publicar
 
-Publishable Key:
-sb_publishable_-TPXzLVpvyiA3QFuyo_wdQ_ozoaQr2M
+### 1. Rode o SQL
+No Supabase:
+**SQL Editor > New query**
 
-## Antes de usar
-1. No Supabase, abra SQL Editor.
-2. Execute `supabase_setup.sql`.
-3. Em Authentication > Users, crie seu usuário com e-mail e senha.
-4. Substitua TODOS os arquivos antigos do repositório pelos arquivos desta pasta.
-5. Faça commit + push.
-6. Aguarde o deploy da Vercel ficar Ready.
-7. Na primeira abertura, use:
-   `https://SEU-DOMINIO.vercel.app/?v=6`
+Cole o conteúdo de `supabase_setup.sql` e clique em **Run**.
 
-Depois disso pode usar o endereço normal.
+### 2. Crie seu usuário
+No Supabase:
+**Authentication > Users**
 
-## Teste no Console
+Crie o e-mail e a senha que serão usados no app.
+
+Se seu projeto exigir confirmação de e-mail, confirme esse usuário no painel ou pelo e-mail enviado.
+
+### 3. Publique
+Envie todos os arquivos desta pasta para o GitHub/Vercel, mantendo `index.html` na raiz.
+
+Arquivos importantes:
+- `index.html`
+- `app.js`
+- `styles.css`
+- `supabase-config.js`
+- `sw.js`
+- `manifest.json`
+
+## Teste rápido
+Depois do deploy, abra no navegador:
+
+`SEU-DOMINIO/supabase-config.js`
+
+Você deve ver a URL do projeto e uma `sb_publishable_...`.
+
+No Console (F12), estes comandos devem funcionar:
+
 `window.SUPABASE_CONFIG`
-
-Deve mostrar a URL e a Publishable Key.
 
 `typeof window.supabase`
 
-Deve retornar `"object"`.
-
 `typeof window.supabase.createClient`
 
-Deve retornar `"function"`.
+Os dois últimos devem resultar em `"object"` e `"function"`.
 
+## Segurança
+A chave incluída é a **Publishable Key**, própria para uso no frontend.
+Não coloque `service_role` ou Secret Key no site.
 
-## V7 — bloqueio manual da porcentagem de comissão
-
-Agora existe um controle em **Vendas & comissão** para travar apenas a porcentagem.
-
-Exemplo:
-- vendas atuais: R$ 320.000
-- percentual automático: 1,5%
-- trava ativada: 1,5%
-- novas vendas levam o total para R$ 450.000
-- total vendido continua R$ 450.000
-- percentual continua 1,5%
-- comissão = R$ 450.000 × 1,5%
-
-Ao desligar a trava, o app volta imediatamente ao percentual automático correspondente ao total vendido.
+## Cache/Vercel
+Esta versão inclui `vercel.json` para impedir cache antigo de `index.html`, `app.js` e `supabase-config.js`.
+Ela também remove automaticamente Service Workers antigos do navegador para evitar o problema de “Supabase ainda não configurado” após um novo deploy.

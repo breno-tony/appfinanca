@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
   <title>Meu Financeiro</title>
-  <link rel="stylesheet" href="styles-v7.css?v=7" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
@@ -26,8 +27,8 @@
       </div>
 
       <div id="supabaseSetupWarning" class="setup-warning" hidden>
-        <strong>Não foi possível conectar</strong>
-        <span id="supabaseSetupMessage">Verifique a conexão e tente novamente.</span>
+        <strong>Supabase ainda não configurado</strong>
+        <span>Preencha o arquivo <code>supabase-config.js</code> com a URL e a Publishable/Anon Key do seu projeto.</span>
       </div>
 
       <form id="loginForm" class="auth-form">
@@ -233,46 +234,6 @@
           <button class="btn primary" id="addSaleBtn">+ Registrar venda</button>
         </div>
 
-        <article class="card commission-lock-card">
-          <div class="commission-lock-head">
-            <div>
-              <p class="eyebrow">CONTROLE DE COMISSÃO</p>
-              <h2>Travar aumento da porcentagem</h2>
-              <p class="muted">O total vendido continua somando normalmente. Somente o aumento da % fica congelado.</p>
-            </div>
-            <label class="switch-wrap">
-              <input type="checkbox" id="commissionLockToggle">
-              <span class="switch"></span>
-              <strong id="commissionLockStatus">Automático</strong>
-            </label>
-          </div>
-
-          <div class="commission-lock-controls">
-            <label>Percentual travado
-              <select id="commissionLockedRate" class="input">
-                <option value="0.5">0,5%</option>
-                <option value="1">1,0%</option>
-                <option value="1.5">1,5%</option>
-                <option value="2">2,0%</option>
-                <option value="2.5">2,5%</option>
-                <option value="3">3,0%</option>
-                <option value="3.5">3,5%</option>
-                <option value="4">4,0%</option>
-                <option value="4.5">4,5%</option>
-                <option value="5">5,0%</option>
-                <option value="5.5">5,5%</option>
-                <option value="6">6,0%</option>
-              </select>
-            </label>
-
-            <div class="commission-lock-preview">
-              <span>Modo atual</span>
-              <strong id="commissionModePreview">Automático por faixa</strong>
-              <small id="commissionModeHelp">A porcentagem aumenta conforme o total vendido.</small>
-            </div>
-          </div>
-        </article>
-
         <article class="card info-banner">
           <strong>Regra configurada:</strong>
           <span id="commissionRuleDescription"></span>
@@ -402,17 +363,8 @@
               <label>Acréscimo a cada R$ 100 mil
                 <input id="settingCommissionStep" class="input" inputmode="decimal" />
               </label>
-              <label>Travar aumento da %
-                <select id="settingCommissionLockEnabled" class="input">
-                  <option value="false">Não — automático</option>
-                  <option value="true">Sim — travado</option>
-                </select>
-              </label>
-              <label>Percentual travado
-                <input id="settingCommissionLockedRate" class="input" inputmode="decimal" />
-              </label>
             </div>
-            <p class="hint">Quando o bloqueio está ativo, somente a porcentagem deixa de subir. O total vendido continua somando e a comissão é recalculada sobre o total usando a taxa travada.</p>
+            <p class="hint">A taxa da faixa é aplicada sobre o total vendido na competência. A comissão é prevista para o dia 10 do mês seguinte.</p>
           </article>
 
           <article class="card">
@@ -575,26 +527,9 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script>
-    // Remove qualquer Service Worker/cache antigo das versões anteriores.
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations()
-        .then(regs => regs.forEach(reg => reg.unregister()))
-        .catch(() => {});
-    }
-    if ("caches" in window) {
-      caches.keys()
-        .then(keys => keys.forEach(key => caches.delete(key)))
-        .catch(() => {});
-    }
 
-    // Supabase configurado diretamente no HTML para não depender de arquivo externo.
-    window.SUPABASE_CONFIG = {
-      url: "https://cuofjjvwgsgkhqhonrwc.supabase.co",
-      publishableKey: "sb_publishable_-TPXzLVpvyiA3QFuyo_wdQ_ozoaQr2M"
-    };
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app-v7.js?v=7"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
