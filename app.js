@@ -40,6 +40,12 @@
   let currentView = "dashboard";
   let chartRaf = null;
 
+  let supabaseClient = null;
+  let currentUser = null;
+  let remoteReady = false;
+  let remoteSaveTimer = null;
+  let authLoading = false;
+
   const $ = (id) => document.getElementById(id);
   const qsa = (sel, ctx=document) => [...ctx.querySelectorAll(sel)];
 
@@ -64,6 +70,175 @@
 
   function saveData(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if(remoteReady && currentUser){
+      clearTimeout(remoteSaveTimer);
+      setSyncStatus("saving","Salvando…");
+      remoteSaveTimer = setTimeout(syncRemoteNow, 350);
+    }
+  }
+
+  function setSyncStatus(kind, text){
+    const el = $("syncStatus");
+    if(!el) return;
+    el.className = `sync-pill ${kind||""}`.trim();
+    el.textContent = text;
+  }
+
+  function normalizeLoadedData(parsed){
+    parsed = parsed || {};
+    return {
+      ...structuredClone(defaultData),
+      ...parsed,
+      settings: {...defaultData.settings, ...(parsed.settings||{})},
+      categories: Array.isArray(parsed.categories) ? parsed.categories : structuredClone(defaultData.categories),
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+      sales: Array.isArray(parsed.sales) ? parsed.sales : []
+    };
+  }
+
+  async function syncRemoteNow(){
+    if(!remoteReady || !currentUser || !supabaseClient) return;
+    setSyncStatus("saving","Salvando…");
+    const { error } = await supabaseClient
+      .from("finance_state")
+      .upsert({
+        user_id: currentUser.id,
+        data: data,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id" });
+    if(error){
+      console.error("Erro ao sincronizar:", error);
+      setSyncStatus("error","Erro ao salvar");
+      return;
+    }
+    setSyncStatus("ok","Salvo na nuvem");
+  }
+
+  async function loadRemoteState(user){
+    remoteReady = false;
+    setSyncStatus("saving","Carregando…");
+    const { data: rows, error } = await supabaseClient
+      .from("finance_state")
+      .select("data,updated_at")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    if(error) throw error;
+
+    if(rows && rows.length && rows[0].data){
+      data = normalizeLoadedData(rows[0].data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }else{
+      const { error: insertError } = await supabaseClient
+        .from("finance_state")
+        .upsert({
+          user_id: user.id,
+          data: data,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+      if(insertError) throw insertError;
+    }
+
+    remoteReady = true;
+    setSyncStatus("ok","Salvo na nuvem");
+  }
+
+  function showAuth(){
+    $("authScreen").style.display = "grid";
+    $("appShell").hidden = true;
+    remoteReady = false;
+    currentUser = null;
+  }
+
+  function showApp(user){
+    currentUser = user;
+    $("authScreen").style.display = "none";
+    $("appShell").hidden = false;
+    $("sidebarUserEmail").textContent = user.email || "Conta conectada";
+    $("settingsUserEmail").textContent = user.email || "Conta conectada";
+  }
+
+  function configLooksValid(){
+    const cfg = window.SUPABASE_CONFIG || {};
+    return /^https:\/\/.+\.supabase\.co$/i.test(String(cfg.url||"")) &&
+      String(cfg.publishableKey||"").length > 20 &&
+      !String(cfg.publishableKey).includes("COLE_AQUI");
+  }
+
+  async function enterAuthenticatedApp(user){
+    showApp(user);
+    try{
+      await loadRemoteState(user);
+      renderAll();
+      navigate(currentView);
+    }catch(err){
+      console.error(err);
+      setSyncStatus("error","Erro no Supabase");
+      alert("Login realizado, mas não foi possível carregar seus dados. Confira se você executou o arquivo supabase_setup.sql no Supabase.");
+    }
+  }
+
+  async function initSupabase(){
+    showAuth();
+
+    if(!configLooksValid() || !window.supabase?.createClient){
+      $("supabaseSetupWarning").hidden = false;
+      $("loginBtn").disabled = true;
+      $("loginError").textContent = "Configure o Supabase antes de entrar.";
+      return;
+    }
+
+    const cfg = window.SUPABASE_CONFIG;
+    supabaseClient = window.supabase.createClient(cfg.url, cfg.publishableKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+
+    const { data: sessionData, error } = await supabaseClient.auth.getSession();
+    if(error) console.error(error);
+
+    if(sessionData?.session?.user){
+      await enterAuthenticatedApp(sessionData.session.user);
+    }
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if(event === "SIGNED_OUT" || !session){
+        showAuth();
+        return;
+      }
+      if(event === "SIGNED_IN" && session.user && session.user.id !== currentUser?.id){
+        setTimeout(() => enterAuthenticatedApp(session.user), 0);
+      }
+    });
+  }
+
+  async function loginWithPassword(email, password){
+    if(authLoading || !supabaseClient) return;
+    authLoading = true;
+    $("loginBtn").disabled = true;
+    $("loginBtn").textContent = "Entrando…";
+    $("loginError").textContent = "";
+
+    const { data: authData, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    authLoading = false;
+    $("loginBtn").disabled = false;
+    $("loginBtn").textContent = "Entrar";
+
+    if(error){
+      $("loginError").textContent = "E-mail ou senha inválidos.";
+      console.error(error);
+      return;
+    }
+    if(authData?.user) await enterAuthenticatedApp(authData.user);
+  }
+
+  async function logout(){
+    if(!supabaseClient) return;
+    await syncRemoteNow();
+    await supabaseClient.auth.signOut();
+    showAuth();
+    $("loginPassword").value = "";
+    $("loginError").textContent = "";
   }
 
   function uid(prefix="id"){
@@ -765,8 +940,18 @@
   }
 
   bindEvents();
-  renderAll();
-  navigate("dashboard");
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await loginWithPassword(
+      $("loginEmail").value.trim(),
+      $("loginPassword").value
+    );
+  });
+  $("logoutBtn").addEventListener("click", logout);
+  $("settingsLogoutBtn").addEventListener("click", logout);
+
+  initSupabase();
 
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
     navigator.serviceWorker.register("sw.js").catch(()=>{});

@@ -9,7 +9,47 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+
+  <section class="auth-screen" id="authScreen">
+    <div class="auth-panel">
+      <div class="auth-brand">
+        <div class="auth-logo">MF</div>
+        <div>
+          <strong>Meu Financeiro</strong>
+          <span>Acesso privado</span>
+        </div>
+      </div>
+
+      <div class="auth-copy">
+        <p class="eyebrow">FINANÇAS NA NUVEM</p>
+        <h1>Entre para acessar seus dados</h1>
+        <p>Use o mesmo e-mail e senha em qualquer computador para abrir o mesmo financeiro.</p>
+      </div>
+
+      <div id="supabaseSetupWarning" class="setup-warning" hidden>
+        <strong>Supabase ainda não configurado</strong>
+        <span>Preencha o arquivo <code>supabase-config.js</code> com a URL e a Publishable/Anon Key do seu projeto.</span>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label>E-mail
+          <input id="loginEmail" class="input" type="email" autocomplete="email" placeholder="seuemail@exemplo.com" required />
+        </label>
+        <label>Senha
+          <input id="loginPassword" class="input" type="password" autocomplete="current-password" placeholder="Sua senha" required />
+        </label>
+        <button id="loginBtn" class="btn primary full auth-submit" type="submit">Entrar</button>
+        <p id="loginError" class="login-error"></p>
+      </form>
+
+      <div class="auth-note">
+        <span>●</span>
+        <p>Seus dados ficam salvos no Supabase e separados por usuário.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">MF</div>
@@ -31,8 +71,8 @@
       <div class="sidebar-foot">
         <div class="privacy-dot"></div>
         <div>
-          <strong>Dados locais</strong>
-          <span>Ficam neste dispositivo.</span>
+          <strong id="sidebarUserEmail">Conta conectada</strong>
+          <span>Supabase sincronizado</span>
         </div>
       </div>
     </aside>
@@ -44,8 +84,10 @@
           <h1 id="pageTitle">Visão geral</h1>
         </div>
         <div class="topbar-actions">
+          <span class="sync-pill" id="syncStatus">Conectando…</span>
           <button class="btn ghost" id="quickBackupBtn">Exportar backup</button>
           <button class="btn primary" id="quickAddBtn">+ Nova movimentação</button>
+          <button class="btn ghost logout-btn" id="logoutBtn">Sair</button>
         </div>
       </header>
 
@@ -275,6 +317,18 @@
 
       <section class="view" id="view-settings">
         <div class="settings-grid">
+          <article class="card account-card">
+            <h2>Conta</h2>
+            <div class="account-line">
+              <div>
+                <span>Usuário conectado</span>
+                <strong id="settingsUserEmail">—</strong>
+              </div>
+              <button class="btn ghost" id="settingsLogoutBtn">Sair da conta</button>
+            </div>
+            <p class="hint">Entre com esta mesma conta em outro computador para carregar os mesmos dados.</p>
+          </article>
+
           <article class="card">
             <h2>Renda fixa</h2>
             <div class="form-grid">
@@ -334,7 +388,7 @@
               </label>
               <button class="btn danger" id="resetDataBtn">Apagar todos os dados</button>
             </div>
-            <p class="hint">Os dados são salvos apenas no navegador usando armazenamento local. Faça backups periódicos.</p>
+            <p class="hint">Os dados principais são sincronizados com o Supabase. O navegador também mantém uma cópia local de apoio. Faça backups periódicos.</p>
           </article>
         </div>
         <div class="settings-save">
@@ -474,6 +528,8 @@
 
   <div id="toast" class="toast"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
