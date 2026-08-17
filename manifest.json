@@ -1,0 +1,9 @@
+{
+  "name": "Meu Financeiro",
+  "short_name": "Financeiro",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0f172a",
+  "description": "Controle pessoal de finanças, vendas, salário e comissão."
+}

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Meu Financeiro</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">MF</div>
+        <div>
+          <strong>Meu Financeiro</strong>
+          <span>Controle pessoal</span>
+        </div>
+      </div>
+
+      <nav id="sidebarNav" class="nav">
+        <button class="nav-item active" data-view="dashboard"><span>⌂</span> Visão geral</button>
+        <button class="nav-item" data-view="transactions"><span>↕</span> Movimentações</button>
+        <button class="nav-item" data-view="sales"><span>◎</span> Vendas & comissão</button>
+        <button class="nav-item" data-view="planning"><span>◷</span> Planejamento</button>
+        <button class="nav-item" data-view="categories"><span>▦</span> Categorias</button>
+        <button class="nav-item" data-view="settings"><span>⚙</span> Configurações</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="privacy-dot"></div>
+        <div>
+          <strong>Dados locais</strong>
+          <span>Ficam neste dispositivo.</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="pageEyebrow">PAINEL FINANCEIRO</p>
+          <h1 id="pageTitle">Visão geral</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn ghost" id="quickBackupBtn">Exportar backup</button>
+          <button class="btn primary" id="quickAddBtn">+ Nova movimentação</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-dashboard">
+        <div class="hero-grid">
+          <article class="card balance-card">
+            <div class="card-label">Saldo atual</div>
+            <div class="money xl" id="balanceValue">R$ 0,00</div>
+            <div class="balance-row">
+              <span id="monthIncomeSmall">Entradas: R$ 0,00</span>
+              <span id="monthExpenseSmall">Saídas: R$ 0,00</span>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-label">Resultado do mês</div>
+            <div class="money lg" id="monthResultValue">R$ 0,00</div>
+            <div class="muted" id="monthResultSubtitle">Entradas menos saídas</div>
+          </article>
+
+          <article class="card">
+            <div class="card-label">Comissão projetada</div>
+            <div class="money lg" id="commissionForecastValue">R$ 0,00</div>
+            <div class="muted" id="commissionForecastSubtitle">Baseada nas vendas do mês</div>
+          </article>
+
+          <article class="card">
+            <div class="card-label">Total vendido no mês</div>
+            <div class="money lg" id="salesMonthValue">R$ 0,00</div>
+            <div class="muted" id="commissionRateText">Faixa atual: 0,5%</div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="card chart-card">
+            <div class="card-head">
+              <div>
+                <h2>Fluxo dos últimos 6 meses</h2>
+                <p>Entradas e saídas já registradas.</p>
+              </div>
+              <div class="legend">
+                <span><i class="legend-dot income"></i> Entradas</span>
+                <span><i class="legend-dot expense"></i> Saídas</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="cashFlowChart"></canvas>
+              <div id="chartEmpty" class="empty-overlay">Registre movimentações para visualizar o gráfico.</div>
+            </div>
+          </article>
+
+          <article class="card schedule-card">
+            <div class="card-head">
+              <div>
+                <h2>Próximos recebimentos</h2>
+                <p>Salário, adiantamento e comissão.</p>
+              </div>
+            </div>
+            <div id="receivablesList" class="receivable-list"></div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Resumo por categoria</h2>
+                <p>Maiores saídas no mês atual.</p>
+              </div>
+            </div>
+            <div id="categorySummary" class="category-bars"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Movimentações recentes</h2>
+                <p>Últimos lançamentos.</p>
+              </div>
+              <button class="link-btn" data-go="transactions">Ver todas</button>
+            </div>
+            <div id="recentTransactions" class="compact-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="view-transactions">
+        <div class="section-toolbar">
+          <div class="filter-group">
+            <select id="transactionMonthFilter" class="input"></select>
+            <select id="transactionTypeFilter" class="input">
+              <option value="all">Todas</option>
+              <option value="income">Entradas</option>
+              <option value="expense">Saídas</option>
+            </select>
+            <input id="transactionSearch" class="input grow" type="search" placeholder="Buscar descrição ou categoria..." />
+          </div>
+          <button class="btn primary" id="addTransactionBtn">+ Adicionar</button>
+        </div>
+
+        <div class="stats-strip">
+          <div><span>Entradas filtradas</span><strong id="filteredIncome">R$ 0,00</strong></div>
+          <div><span>Saídas filtradas</span><strong id="filteredExpense">R$ 0,00</strong></div>
+          <div><span>Resultado</span><strong id="filteredResult">R$ 0,00</strong></div>
+        </div>
+
+        <article class="card table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th>Tipo</th>
+                  <th>Valor</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="transactionsTableBody"></tbody>
+            </table>
+          </div>
+          <div id="transactionsEmpty" class="empty-state">Nenhuma movimentação encontrada.</div>
+        </article>
+      </section>
+
+      <section class="view" id="view-sales">
+        <div class="hero-grid sales-metrics">
+          <article class="card"><div class="card-label">Vendas da competência</div><div class="money lg" id="salesCompetencyTotal">R$ 0,00</div></article>
+          <article class="card"><div class="card-label">Faixa de comissão</div><div class="money lg" id="salesCompetencyRate">0,5%</div></article>
+          <article class="card"><div class="card-label">Comissão prevista</div><div class="money lg" id="salesCompetencyCommission">R$ 0,00</div></article>
+          <article class="card"><div class="card-label">Recebimento previsto</div><div class="money md" id="salesCompetencyPayday">—</div></article>
+        </div>
+
+        <div class="section-toolbar">
+          <div class="filter-group">
+            <select id="salesMonthFilter" class="input"></select>
+            <select id="salesStatusFilter" class="input">
+              <option value="all">Todos os status</option>
+              <option value="valid">Ativas</option>
+              <option value="cancelled">Canceladas</option>
+            </select>
+          </div>
+          <button class="btn primary" id="addSaleBtn">+ Registrar venda</button>
+        </div>
+
+        <article class="card info-banner">
+          <strong>Regra configurada:</strong>
+          <span id="commissionRuleDescription"></span>
+        </article>
+
+        <article class="card table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Cliente / venda</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Competência</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="salesTableBody"></tbody>
+            </table>
+          </div>
+          <div id="salesEmpty" class="empty-state">Nenhuma venda registrada nesta competência.</div>
+        </article>
+      </section>
+
+      <section class="view" id="view-planning">
+        <div class="planning-grid">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Calendário financeiro</h2>
+                <p>Previsões para os próximos meses.</p>
+              </div>
+            </div>
+            <div id="planningTimeline" class="timeline"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Orçamento mensal</h2>
+                <p>Defina um limite de saídas para acompanhar seu ritmo.</p>
+              </div>
+            </div>
+            <div class="budget-panel">
+              <div class="budget-head">
+                <span>Limite configurado</span>
+                <strong id="budgetLimitValue">R$ 0,00</strong>
+              </div>
+              <div class="progress"><div id="budgetProgressBar"></div></div>
+              <div class="budget-foot">
+                <span id="budgetUsedText">R$ 0,00 usados</span>
+                <span id="budgetRemainingText">R$ 0,00 restantes</span>
+              </div>
+              <button class="btn secondary full" id="editBudgetBtn">Editar orçamento</button>
+            </div>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <h2>Projeção de caixa</h2>
+              <p>Saldo atual + recebimentos previstos, sem considerar novas despesas.</p>
+            </div>
+          </div>
+          <div id="projectionCards" class="projection-grid"></div>
+        </article>
+      </section>
+
+      <section class="view" id="view-categories">
+        <div class="section-toolbar">
+          <div>
+            <h2 class="inline-title">Categorias</h2>
+            <p class="muted">Organize suas movimentações e mantenha os relatórios limpos.</p>
+          </div>
+          <button class="btn primary" id="addCategoryBtn">+ Nova categoria</button>
+        </div>
+        <div id="categoriesGrid" class="categories-grid"></div>
+      </section>
+
+      <section class="view" id="view-settings">
+        <div class="settings-grid">
+          <article class="card">
+            <h2>Renda fixa</h2>
+            <div class="form-grid">
+              <label>Salário bruto mensal
+                <input id="settingSalary" class="input" inputmode="decimal" />
+              </label>
+              <label>Adiantamento no dia 20 (%)
+                <input id="settingAdvancePercent" class="input" inputmode="decimal" />
+              </label>
+              <label>INSS estimado (%)
+                <input id="settingInssPercent" class="input" inputmode="decimal" />
+              </label>
+              <label>Saldo inicial
+                <input id="settingInitialBalance" class="input" inputmode="decimal" />
+              </label>
+            </div>
+            <p class="hint">O INSS aqui é apenas uma estimativa configurável. O app não substitui cálculo de folha oficial.</p>
+          </article>
+
+          <article class="card">
+            <h2>Comissão</h2>
+            <div class="form-grid">
+              <label>Até R$ 199.999,99
+                <input id="settingCommissionTier1" class="input" inputmode="decimal" />
+              </label>
+              <label>R$ 200 mil a R$ 299.999,99
+                <input id="settingCommissionTier2" class="input" inputmode="decimal" />
+              </label>
+              <label>A partir de R$ 300 mil — taxa inicial
+                <input id="settingCommissionTier3" class="input" inputmode="decimal" />
+              </label>
+              <label>Acréscimo a cada R$ 100 mil
+                <input id="settingCommissionStep" class="input" inputmode="decimal" />
+              </label>
+            </div>
+            <p class="hint">A taxa da faixa é aplicada sobre o total vendido na competência. A comissão é prevista para o dia 10 do mês seguinte.</p>
+          </article>
+
+          <article class="card">
+            <h2>Planejamento</h2>
+            <div class="form-grid">
+              <label>Limite mensal de saídas
+                <input id="settingMonthlyBudget" class="input" inputmode="decimal" />
+              </label>
+              <label>Dia de recebimento da comissão
+                <input id="settingCommissionDay" class="input" inputmode="numeric" />
+              </label>
+            </div>
+          </article>
+
+          <article class="card danger-zone">
+            <h2>Dados e backup</h2>
+            <div class="stack-actions">
+              <button class="btn secondary" id="exportBackupBtn">Exportar backup (.json)</button>
+              <label class="btn secondary file-btn">Importar backup
+                <input id="importBackupInput" type="file" accept=".json,application/json" hidden />
+              </label>
+              <button class="btn danger" id="resetDataBtn">Apagar todos os dados</button>
+            </div>
+            <p class="hint">Os dados são salvos apenas no navegador usando armazenamento local. Faça backups periódicos.</p>
+          </article>
+        </div>
+        <div class="settings-save">
+          <button class="btn primary" id="saveSettingsBtn">Salvar configurações</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Resumo</small></button>
+    <button class="bottom-item" data-view="transactions"><span>↕</span><small>Movimentos</small></button>
+    <button class="bottom-main" id="bottomAddBtn">+</button>
+    <button class="bottom-item" data-view="sales"><span>◎</span><small>Vendas</small></button>
+    <button class="bottom-item" data-view="planning"><span>◷</span><small>Planejar</small></button>
+  </div>
+
+  <div class="modal" id="transactionModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="transactionModal"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div><p class="eyebrow">MOVIMENTAÇÃO</p><h2 id="transactionModalTitle">Nova movimentação</h2></div>
+        <button class="icon-btn" data-close="transactionModal">×</button>
+      </div>
+      <form id="transactionForm">
+        <input type="hidden" id="transactionId" />
+        <div class="segmented">
+          <label><input type="radio" name="transactionType" value="expense" checked><span>Saída</span></label>
+          <label><input type="radio" name="transactionType" value="income"><span>Entrada</span></label>
+        </div>
+        <label>Valor
+          <input id="transactionAmount" class="input money-input" inputmode="decimal" placeholder="0,00" required />
+        </label>
+        <div class="form-grid">
+          <label>Data
+            <input id="transactionDate" class="input" type="date" required />
+          </label>
+          <label>Categoria
+            <select id="transactionCategory" class="input" required></select>
+          </label>
+        </div>
+        <label>Descrição
+          <input id="transactionDescription" class="input" placeholder="Ex.: Mercado, aluguel, salário..." required />
+        </label>
+        <label>Observação
+          <textarea id="transactionNote" class="input" rows="3" placeholder="Opcional"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close="transactionModal">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="saleModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="saleModal"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div><p class="eyebrow">VENDA</p><h2 id="saleModalTitle">Registrar venda</h2></div>
+        <button class="icon-btn" data-close="saleModal">×</button>
+      </div>
+      <form id="saleForm">
+        <input type="hidden" id="saleId" />
+        <label>Valor da venda
+          <input id="saleAmount" class="input money-input" inputmode="decimal" placeholder="0,00" required />
+        </label>
+        <div class="form-grid">
+          <label>Data da venda
+            <input id="saleDate" class="input" type="date" required />
+          </label>
+          <label>Status
+            <select id="saleStatus" class="input">
+              <option value="valid">Ativa</option>
+              <option value="cancelled">Cancelada</option>
+            </select>
+          </label>
+        </div>
+        <label>Cliente / identificação
+          <input id="saleClient" class="input" placeholder="Nome do cliente ou referência" required />
+        </label>
+        <label>Observação
+          <textarea id="saleNote" class="input" rows="3" placeholder="Opcional"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close="saleModal">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar venda</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="categoryModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="categoryModal"></div>
+    <div class="modal-card small">
+      <div class="modal-head">
+        <div><p class="eyebrow">CATEGORIA</p><h2>Nova categoria</h2></div>
+        <button class="icon-btn" data-close="categoryModal">×</button>
+      </div>
+      <form id="categoryForm">
+        <label>Nome
+          <input id="categoryName" class="input" placeholder="Ex.: Alimentação" required />
+        </label>
+        <label>Tipo padrão
+          <select id="categoryType" class="input">
+            <option value="expense">Saída</option>
+            <option value="income">Entrada</option>
+            <option value="both">Ambos</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close="categoryModal">Cancelar</button>
+          <button type="submit" class="btn primary">Criar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="budgetModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="budgetModal"></div>
+    <div class="modal-card small">
+      <div class="modal-head">
+        <div><p class="eyebrow">ORÇAMENTO</p><h2>Limite mensal</h2></div>
+        <button class="icon-btn" data-close="budgetModal">×</button>
+      </div>
+      <form id="budgetForm">
+        <label>Valor máximo de saídas no mês
+          <input id="budgetAmount" class="input money-input" inputmode="decimal" required />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close="budgetModal">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
